@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Notes — Notebook</title>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;600;700&family=Courier+Prime:wght@400;700&display=swap"
+        rel="stylesheet">
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        paper: '#f8ecc3',
+                        'paper-lt': '#fcf6de',
+                        margin: '#d6584f',
+                        accent: '#c1443b',
+                        ink: '#2b2417',
+                        muted: '#8c8163',
+                        gold: '#d9c568',
+                        ring: '#efe2a8',
+                    },
+                    fontFamily: {
+                        hand: ['Caveat', 'cursive'],
+                        type: ['"Courier Prime"', '"Courier New"', 'monospace'],
+                    },
+                },
+            },
+        };
+    </script>
+
+    <style>
+        :root {
+            /* the notebook writing rhythm — every ruled line, every font
+       size, every hole spacing is derived from this one number */
+            --line-h: 38px;
+            --rule: rgba(120, 98, 45, .16);
+            --rule-strong: rgba(120, 98, 45, .26);
+        }
+
+        body {
+            font-family: 'Courier Prime', 'Courier New', monospace;
+        }
+
+        /* ============================================================
+     RULED PAPER — single source of truth for notebook lines.
+     Two variants:
+       .ruled        fixed-height surfaces (note cards)
+       .ruled-scroll grows/scrolls with content (the editor page),
+                      using background-attachment:local so the
+                      lines travel WITH the text instead of being
+                      redrawn or duplicated underneath it.
+     Nothing else in this file paints a second set of lines.
+  ============================================================ */
+        .ruled {
+            background-color: var(--paper, #f8ecc3);
+            background-image: repeating-linear-gradient(to bottom,
+                    transparent 0,
+                    transparent calc(var(--line-h) - 1px),
+                    var(--rule) calc(var(--line-h) - 1px),
+                    var(--rule) var(--line-h));
+            background-size: 100% var(--line-h);
+        }
+
+        .ruled-scroll {
+            background-image: repeating-linear-gradient(to bottom,
+                    transparent 0,
+                    transparent calc(var(--line-h) - 1px),
+                    var(--rule) calc(var(--line-h) - 1px),
+                    var(--rule) var(--line-h));
+            background-size: 100% var(--line-h);
+            background-attachment: local;
+            /* lines scroll with the text */
+        }
+
+        .paper-holes {
+            display: flex;
+            flex-direction: column;
+            gap: 34px;
+        }
+
+        .paper-holes .hole {
+            width: 13px;
+            height: 13px;
+            border-radius: 9999px;
+            border: 2px solid var(--gold, #d9c568);
+            background: radial-gradient(circle at 35% 30%, #fffceb, #efe2a8 70%);
+            box-shadow: inset 0 1px 2px rgba(0, 0, 0, .15);
+        }
+
+        /* form fields sit on the paper — no boxes, no borders, no
+     background of their own, so the ruled lines underneath are
+     the only lines the eye sees */
+        .paper-field {
+            background: transparent;
+            border: 0;
+            outline: 0;
+            resize: none;
+            color: var(--ink, #2b2417);
+            line-height: var(--line-h);
+        }
+
+        .paper-field::placeholder {
+            color: var(--muted, #8c8163);
+            opacity: .75;
+        }
+
+        ::-webkit-scrollbar {
+            width: 10px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--gold, #d9c568);
+            border-radius: 9999px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .filter-chip[data-active="true"] {
+            background: #2b2417;
+            color: #f8ecc3;
+            border-color: #2b2417;
+        }
+    </style>
+</head>
+
+<body class="min-h-screen bg-[#eeeade] text-ink">
+
+    <main class="w-[min(1400px,calc(100%-2.5rem))] mx-auto my-8">
+
+        <!-- ================= HEADER ================= -->
+        <header class="flex items-end justify-between gap-6 mb-8 flex-wrap">
+            <div>
+                <div id="todayLabel" class="text-accent font-bold tracking-wide text-lg"></div>
+                <h1 class="font-hand text-6xl font-bold leading-none -mt-1">My Notes</h1>
+            </div>
+
+            <div class="flex items-center gap-5">
+                <span id="clockLabel" class="text-lg text-muted tabular-nums"></span>
+                <button id="newNoteBtn" class="rounded-md border border-gold bg-[#f8eaa0] hover:bg-[#f4df78] active:scale-[.98]
+               px-5 py-2.5 font-bold shadow-sm transition">
+                    + New Note
+                </button>
+            </div>
+        </header>
+
+        <!-- ================= DASHBOARD ================= -->
+        <section id="dashboard" class="grid grid-cols-2 md:grid-cols-4 gap-5 mb-8"></section>
+
+        <!-- ================= TOOLBAR ================= -->
+        <section class="flex items-center justify-between gap-5 mb-6 flex-wrap">
+            <div class="flex gap-3">
+                <button class="filter-chip border border-gold rounded-full px-4 py-2 font-bold transition"
+                    data-filter="all" data-active="true">
+                    All Notes <span id="allCount">0</span>
+                </button>
+                <button class="filter-chip border border-gold rounded-full px-4 py-2 font-bold transition"
+                    data-filter="pinned" data-active="false">
+                    📌 Favourites <span id="pinnedCount">0</span>
+                </button>
+            </div>
+
+            <div class="flex items-center gap-3">
+                <label
+                    class="flex items-center gap-2 bg-paper-lt border border-gold/70 rounded-md px-3 py-2 min-w-[240px]">
+                    <span class="text-muted">⌕</span>
+                    <input id="searchInput" type="search" placeholder="Search notes..."
+                        class="bg-transparent outline-none w-full placeholder:text-muted">
+                </label>
+
+                <select id="sortSelect"
+                    class="border border-gold rounded-md bg-[#f8eaa0] px-3 py-2 font-bold outline-none cursor-pointer">
+                    <option value="newest">Newest</option>
+                    <option value="oldest">Oldest</option>
+                    <option value="title">Title</option>
+                </select>
+            </div>
+        </section>
+
+        <div id="status" class="min-h-[1.5rem] text-muted mb-2"></div>
+
+        <!-- ================= NOTE GRID ================= -->
+        <section id="notesList" class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-7"></section>
+    </main>
+
+    <!-- ================= EDITOR ================= -->
+    <div id="editorOverlay"
+        class="fixed inset-0 z-50 hidden items-center justify-center p-6 bg-[#2f2a1b]/50 backdrop-blur-[2px]">
+
+        <section class="relative w-[min(1040px,95vw)] h-[min(740px,90vh)] rounded-sm border border-gold
+                   shadow-[0_20px_55px_rgba(0,0,0,.3)] bg-paper-lt overflow-hidden">
+
+            <!-- spiral holes -->
+            <div class="paper-holes absolute left-5 top-9 z-10" aria-hidden="true">
+                <i class="hole"></i><i class="hole"></i><i class="hole"></i>
+                <i class="hole"></i><i class="hole"></i><i class="hole"></i>
+            </div>
+
+            <!-- red margin rule -->
+            <div class="absolute left-[74px] top-0 bottom-0 w-[2px] bg-margin/80 z-10" aria-hidden="true"></div>
+
+            <button id="closeEditor" aria-label="Close"
+                class="absolute right-6 top-4 z-20 text-3xl leading-none text-muted hover:text-ink transition">×</button>
+
+            <!-- the page itself: ruled lines live here and scroll WITH the text -->
+            <div id="editorInner" class="ruled-scroll relative h-full overflow-y-auto pl-[138px] pr-12 py-8">
+
+                <div id="editorLabel" class="text-accent font-bold text-lg">NEW NOTE</div>
+                <div id="editorDate" class="absolute right-12 top-8 text-sm text-muted"></div>
+
+                <h2 class="font-hand text-4xl font-bold my-1" style="line-height:var(--line-h)">Write a note</h2>
+
+                <form id="noteForm">
+                    <input type="hidden" id="noteId">
+
+                    <input id="noteTitle" maxlength="200" placeholder="Title" required
+                        class="paper-field font-hand text-3xl font-bold w-full block mt-2">
+
+                    <textarea id="noteContent" placeholder="Start writing..." required rows="5"
+                        class="paper-field w-full block mt-1 text-[19px]" style="min-height:210px"></textarea>
+
+                    <label class="flex items-center gap-2 mt-4 text-[17px]">
+                        <input type="checkbox" id="notePinned" class="accent-accent w-4 h-4">
+                        <span>📌 Add to favourites</span>
+                    </label>
+
+                    <div class="flex justify-end items-center gap-6 mt-6 pb-4">
+                        <button type="button" id="cancelEditor" class="font-bold text-muted hover:text-ink transition">
+                            Cancel
+                        </button>
+                        <button type="submit"
+                            class="rounded-md border border-gold bg-[#f8eaa0] hover:bg-[#f4df78] px-6 py-2.5 font-bold shadow-sm transition">
+                            Save Note
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </section>
+    </div>
+
+    <script>
+        /* =========================
+           DEMO DATA
+           This standalone HTML does not connect to Django.
+           Later, your Django API can replace these functions.
+        ========================= */
+        let notes = [
+            { id: 1, title: "Learn Django", content: "Today I learned Django REST\nFramework", pinned: false, updated_at: "2026-08-22T11:06:00" },
+            { id: 2, title: "AI", content: "SGCUISAB;IU", pinned: false, updated_at: "2026-08-22T10:45:00" },
+            { id: 3, title: "hello", content: "working", pinned: true, updated_at: "2026-08-21T17:24:00" },
+        ];
+
+        let currentFilter = "all";
+        let editingId = null;
+
+        /* CLOCK */
+        function updateClock() {
+            const now = new Date();
+            document.getElementById("todayLabel").textContent =
+                now.toLocaleDateString("en-US", { weekday: "long" });
+            document.getElementById("clockLabel").textContent =
+                now.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
+        }
+        setInterval(updateClock, 1000);
+        updateClock();
+
+        /* DATE FORMAT */
+        function formatDate(dateString) {
+            const date = new Date(dateString);
+            return date.toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" }).toUpperCase()
+                + ", " + date.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
+        }
+
+        /* DASHBOARD */
+        function timeAgo(dateString) {
+            const diffMs = Date.now() - new Date(dateString).getTime();
+            const mins = Math.round(diffMs / 60000);
+            if (mins < 1) return "just now";
+            if (mins < 60) return `${mins}m ago`;
+            const hrs = Math.round(mins / 60);
+            if (hrs < 24) return `${hrs}h ago`;
+            const days = Math.round(hrs / 24);
+            return `${days}d ago`;
+        }
+
+        function renderDashboard() {
+            const board = document.getElementById("dashboard");
+            const total = notes.length;
+            const pinned = notes.filter(n => n.pinned).length;
+
+            const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+            const thisWeek = notes.filter(n => new Date(n.updated_at).getTime() >= weekAgo).length;
+
+            const words = notes.reduce((sum, n) => sum + n.content.trim().split(/\s+/).filter(Boolean).length, 0);
+
+            const latest = notes.slice().sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at))[0];
+            const lastEdited = latest ? timeAgo(latest.updated_at) : "—";
+
+            const stats = [
+                { label: "Total Notes", value: total, icon: "📓" },
+                { label: "Pinned", value: pinned, icon: "📌" },
+                { label: "Added This Week", value: thisWeek, icon: "🗓️" },
+                { label: "Last Edited", value: lastEdited, icon: "🖊️", small: true },
+            ];
+
+            board.innerHTML = stats.map(s => `
+    <div class="ruled relative rounded-lg border border-gold/70 shadow-sm px-5 py-4 overflow-hidden">
+      <div class="absolute right-4 top-3 text-xl opacity-70">${s.icon}</div>
+      <div class="text-muted font-bold text-sm tracking-wide">${s.label}</div>
+      <div class="font-hand font-bold ${s.small ? 'text-3xl' : 'text-4xl'} mt-1">${s.value}</div>
+    </div>
+  `).join("");
+        }
+
+        /* RENDER NOTES */
+        function renderNotes() {
+            renderDashboard();
+            const list = document.getElementById("notesList");
+            const search = document.getElementById("searchInput").value.trim().toLowerCase();
+
+            let filtered = notes.filter(note => {
+                const matchesFilter = currentFilter === "all" || note.pinned;
+                const matchesSearch = note.title.toLowerCase().includes(search) || note.content.toLowerCase().includes(search);
+                return matchesFilter && matchesSearch;
+            });
+
+            const sort = document.getElementById("sortSelect").value;
+            if (sort === "newest") filtered.sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at));
+            if (sort === "oldest") filtered.sort((a, b) => new Date(a.updated_at) - new Date(b.updated_at));
+            if (sort === "title") filtered.sort((a, b) => a.title.localeCompare(b.title));
+
+            document.getElementById("allCount").textContent = notes.length;
+            document.getElementById("pinnedCount").textContent = notes.filter(n => n.pinned).length;
+
+            if (!filtered.length) {
+                list.innerHTML = `
+      <div class="col-span-full min-h-[220px] grid place-items-center text-center border border-gold/70 rounded-lg bg-paper-lt p-10">
+        <h2 class="font-hand text-3xl font-bold text-muted">No notes found</h2>
+      </div>`;
+                return;
+            }
+
+            list.innerHTML = filtered.map(note => {
+                const content = escapeHtml(note.content);
+                return `
+      <article onclick="openEditor(${note.id})"
+        class="ruled relative min-h-[360px] rounded-xl border-2 border-gold/80 shadow-[0_12px_28px_rgba(70,62,20,.10)]
+               pt-8 pr-7 pb-7 pl-[76px] overflow-hidden hover:-translate-y-0.5 hover:shadow-[0_16px_34px_rgba(70,62,20,.16)]
+               transition cursor-pointer">
+
+        <div class="paper-holes absolute left-3 top-7" aria-hidden="true">
+          <i class="hole"></i><i class="hole"></i><i class="hole"></i><i class="hole"></i><i class="hole"></i>
+        </div>
+        <div class="absolute left-[56px] top-0 bottom-0 w-[2px] bg-margin/75" aria-hidden="true"></div>
+
+        <div class="flex items-start justify-between">
+          <span class="text-accent font-bold text-sm tracking-wide">${note.pinned ? "PINNED" : "NOTE"}</span>
+          <span class="text-[13px] text-muted">${formatDate(note.updated_at)}</span>
+        </div>
+
+        <button class="absolute right-6 top-16 text-2xl hover:scale-110 transition"
+          onclick="event.stopPropagation(); togglePin(${note.id})" title="Pin / Unpin">
+          ${note.pinned ? "📌" : "📍"}
+        </button>
+
+        <h2 class="font-hand text-3xl font-bold mt-2 mb-1 pr-10" style="line-height:var(--line-h)">${escapeHtml(note.title)}</h2>
+
+        <div class="font-type text-[17px] whitespace-pre-wrap max-h-[130px] overflow-hidden" style="line-height:var(--line-h)">${content}</div>
+
+        <div class="absolute left-[76px] right-7 bottom-5 flex items-center gap-6">
+          <span class="text-sm text-muted">Click note to edit</span>
+          <button class="ml-auto text-xl hover:text-accent transition"
+            onclick="event.stopPropagation(); deleteNote(${note.id})" title="Delete">⌫</button>
+        </div>
+      </article>`;
+            }).join("");
+        }
+
+        function escapeHtml(value) {
+            return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;")
+                .replaceAll('"', "&quot;").replaceAll("'", "&#039;");
+        }
+
+        /* PIN / DELETE */
+        function togglePin(id) {
+            const note = notes.find(n => n.id === id);
+            if (!note) return;
+            note.pinned = !note.pinned;
+            renderNotes();
+        }
+        function deleteNote(id) {
+            if (!confirm("Delete this note?")) return;
+            notes = notes.filter(note => note.id !== id);
+            renderNotes();
+        }
+
+        /* AUTO-GROW TEXTAREA — the surrounding page (#editorInner) supplies
+           the ruled lines and grows/scrolls with the textarea, so the lines
+           never end where the typed text ends. */
+        const contentArea = document.getElementById("noteContent");
+        function resizeTextarea() {
+            contentArea.style.height = "auto";
+            contentArea.style.height = Math.max(contentArea.scrollHeight, 210) + "px";
+        }
+        contentArea.addEventListener("input", resizeTextarea);
+
+        /* OPEN NEW */
+        document.getElementById("newNoteBtn").addEventListener("click", () => {
+            editingId = null;
+            document.getElementById("editorLabel").textContent = "NEW NOTE";
+            document.querySelector("#editorInner h2").textContent = "Write a note";
+            document.getElementById("noteTitle").value = "";
+            document.getElementById("noteContent").value = "";
+            document.getElementById("notePinned").checked = false;
+            document.getElementById("editorDate").textContent = formatDate(new Date().toISOString());
+            showEditor();
+            setTimeout(() => { document.getElementById("noteTitle").focus(); resizeTextarea(); }, 50);
+        });
+
+        /* OPEN EDIT */
+        function openEditor(id) {
+            const note = notes.find(n => n.id === id);
+            if (!note) return;
+            editingId = id;
+            document.getElementById("editorLabel").textContent = "EDIT NOTE";
+            document.querySelector("#editorInner h2").textContent = "Edit your note";
+            document.getElementById("noteTitle").value = note.title;
+            document.getElementById("noteContent").value = note.content;
+            document.getElementById("notePinned").checked = note.pinned;
+            document.getElementById("editorDate").textContent = formatDate(note.updated_at);
+            showEditor();
+            setTimeout(() => { resizeTextarea(); document.getElementById("noteTitle").focus(); }, 50);
+        }
+
+        /* SAVE */
+        document.getElementById("noteForm").addEventListener("submit", event => {
+            event.preventDefault();
+            const title = document.getElementById("noteTitle").value.trim();
+            const content = document.getElementById("noteContent").value;
+            const pinned = document.getElementById("notePinned").checked;
+            if (!title || !content.trim()) return;
+
+            if (editingId === null) {
+                notes.unshift({ id: Date.now(), title, content, pinned, updated_at: new Date().toISOString() });
+            } else {
+                const note = notes.find(n => n.id === editingId);
+                if (note) { note.title = title; note.content = content; note.pinned = pinned; note.updated_at = new Date().toISOString(); }
+            }
+            closeEditor();
+            renderNotes();
+        });
+
+        /* OPEN / CLOSE HELPERS — toggle Tailwind's own hidden/flex classes
+           (never mix the native [hidden] attribute with a display utility
+           on the same element; Tailwind's class can outrank it and the
+           overlay ends up visible on load). */
+        function showEditor() {
+            const overlay = document.getElementById("editorOverlay");
+            overlay.classList.remove("hidden");
+            overlay.classList.add("flex");
+        }
+        function closeEditor() {
+            const overlay = document.getElementById("editorOverlay");
+            overlay.classList.remove("flex");
+            overlay.classList.add("hidden");
+        }
+        document.getElementById("closeEditor").addEventListener("click", closeEditor);
+        document.getElementById("cancelEditor").addEventListener("click", closeEditor);
+
+        /* FILTERS */
+        document.querySelectorAll(".filter-chip").forEach(button => {
+            button.addEventListener("click", () => {
+                document.querySelectorAll(".filter-chip").forEach(btn => btn.dataset.active = "false");
+                button.dataset.active = "true";
+                currentFilter = button.dataset.filter;
+                renderNotes();
+            });
+        });
+
+        document.getElementById("searchInput").addEventListener("input", renderNotes);
+        document.getElementById("sortSelect").addEventListener("change", renderNotes);
+
+        /* ESC CLOSE */
+        document.addEventListener("keydown", event => { if (event.key === "Escape") closeEditor(); });
+
+        /* Initial render */
+        renderNotes();
+    </script>
+</body>
+
+</html>

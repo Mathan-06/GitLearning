@@ -1,9 +1,7 @@
 from django.urls import path
-from .views import NoteListCreateView
-from .views import NoteDetailView
+from .views import NoteListCreateView, NoteDetailView
 
-urlpatterns =[
-    path('notes/', NoteListCreateView.as_view(),name='notes'),
-    path('notes/<int:pk>/', NoteDetailView.as_view(), name='note-detail'),
-
+urlpatterns = [
+    path("", NoteListCreateView.as_view(), name="notes-list-create"),
+    path("<int:pk>/", NoteDetailView.as_view(), name="note-detail"),
 ]

@@ -1,0 +1,16 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#fff7a8">
+    <title>{% block title %}Notes{% endblock %}</title>
+    <link rel="stylesheet" href="{% static 'notes/css/style.css' %}">
+</head>
+<body>
+    {% csrf_token %}
+    {% block content %}{% endblock %}
+    <script src="{% static 'notes/js/app.js' %}"></script>
+</body>
+</html>
