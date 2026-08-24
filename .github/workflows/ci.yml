@@ -14,15 +14,18 @@ jobs:
 
       - name: Set up Python
         uses: actions/setup-python@v5
-        with: 
+        with:
           python-version: "3.11"
-      
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          python -m pip install django djangorestframework
-           
+          pip install -r gitlearn/requirements.txt
 
       - name: Run Django checks
-        run:
-          python manage.py check
+        working-directory: ./gitlearn
+        run: python manage.py check
+
+      - name: Run Django tests
+        working-directory: ./gitlearn
+        run: python manage.py test
