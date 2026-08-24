@@ -20,8 +20,8 @@ jobs:
       - name: Install dependencies
         run: 
           python -m pip install --upgrade pip 
-          pip install django
-          pip install djangorestframework
+          pip install django djangorestframework
+           
 
       - name: Run Django checks
         run:
