@@ -252,11 +252,22 @@
            This standalone HTML does not connect to Django.
            Later, your Django API can replace these functions.
         ========================= */
-        let notes = [
-            { id: 1, title: "Learn Django", content: "Today I learned Django REST\nFramework", pinned: false, updated_at: "2026-08-22T11:06:00" },
-            { id: 2, title: "AI", content: "SGCUISAB;IU", pinned: false, updated_at: "2026-08-22T10:45:00" },
-            { id: 3, title: "hello", content: "working", pinned: true, updated_at: "2026-08-21T17:24:00" },
-        ];
+       let notes=[];
+       const API_URL = "http://127.0.0.1:8000/api/notes/";
+
+       async function loadNotes() {
+        try{
+            const response = await fetch(API_URL);
+            if(!response.ok){
+                throw new Error("Failed to fetch notes");
+            }
+            notes = await response.json();
+            renderNotes();
+        } catch(error){
+            console.error(error);
+            document.getElementById("status").textContent="Could not connect to Django backend."
+        }
+       }
 
         let currentFilter = "all";
         let editingId = null;
@@ -441,22 +452,52 @@
         }
 
         /* SAVE */
-        document.getElementById("noteForm").addEventListener("submit", event => {
-            event.preventDefault();
-            const title = document.getElementById("noteTitle").value.trim();
-            const content = document.getElementById("noteContent").value;
-            const pinned = document.getElementById("notePinned").checked;
-            if (!title || !content.trim()) return;
+        document.getElementById("noteForm").addEventListener("submit", async event => {
+    event.preventDefault();
 
-            if (editingId === null) {
-                notes.unshift({ id: Date.now(), title, content, pinned, updated_at: new Date().toISOString() });
-            } else {
-                const note = notes.find(n => n.id === editingId);
-                if (note) { note.title = title; note.content = content; note.pinned = pinned; note.updated_at = new Date().toISOString(); }
-            }
-            closeEditor();
-            renderNotes();
+    const title = document.getElementById("noteTitle").value.trim();
+    const content = document.getElementById("noteContent").value;
+    const pinned = document.getElementById("notePinned").checked;
+
+    if (!title || !content.trim()) {
+        return;
+    }
+
+    const noteData = {
+        title: title,
+        content: content,
+        pinned: pinned
+    };
+
+    try {
+        const response = await fetch(API_URL, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify(noteData)
         });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            console.error(errorData);
+            throw new Error("Failed to save note");
+        }
+
+        const newNote = await response.json();
+
+        notes.unshift(newNote);
+
+        closeEditor();
+        renderNotes();
+
+    } catch (error) {
+        console.error(error);
+
+        document.getElementById("status").textContent =
+            "Not saving note";
+    }
+});
 
         /* OPEN / CLOSE HELPERS — toggle Tailwind's own hidden/flex classes
            (never mix the native [hidden] attribute with a display utility
