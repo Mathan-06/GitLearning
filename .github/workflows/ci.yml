@@ -23,7 +23,7 @@ jobs:
           pip install django djangorestframework
 
       - name: Run Django checks
-        working-directory: ./gitlearn
+        working-directory: ./gittlearn
         run: python manage.py check
 
       - name: Run Django tests
