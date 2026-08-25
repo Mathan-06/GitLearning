@@ -1,0 +1,7 @@
+[tool.ruff.lint]
+ignore = ["RUF012"]
+
+[tool.ruff]
+exclude = [
+    "*/migrations/*",
+]
