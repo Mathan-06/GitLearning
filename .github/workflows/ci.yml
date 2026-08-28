@@ -20,7 +20,8 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install django djangorestframework django-cors-headers
+          pip install django djangorestframework django-cors-headers ruff
+          ruff check .
 
       - name: Run Django checks
         working-directory: ./gittlearn
